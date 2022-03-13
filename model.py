@@ -1,7 +1,5 @@
-import h2o
 import numpy as np
 import pandas as pd
-from h2o.estimators import H2OEstimator as H2OClassifier
 from sklearn.base import ClassifierMixin as ScikitClassifier
 from sklearn.calibration import calibration_curve
 from tensorflow.keras import Model as KerasBaseModel
@@ -11,9 +9,7 @@ from calibration import IsotonicCalibrator, SigmoidCalibrator
 
 class CalibratableModelFactory:
     def get_model(self, base_model):
-        if isinstance(base_model, H2OClassifier):
-            return H2OModel(base_model)
-        elif isinstance(base_model, ScikitClassifier):
+        if isinstance(base_model, ScikitClassifier):
             return ScikitModel(base_model)
         elif isinstance(base_model, KerasBaseModel):
             return KerasModel(base_model)
@@ -55,27 +51,6 @@ class CalibratableModelMixin:
 
     def _get_accuracy(self, y, preds):
         return np.mean(np.equal(y.astype(np.bool), preds >= 0.5))
-
-
-class H2OModel(CalibratableModelMixin):
-    def train(self, X, y):
-        self.features = list(range(len(X[0])))
-        self.target = "target"
-        train_frame = self._to_h2o_frame(X, y)
-        self.model.train(x=self.features, y=self.target, training_frame=train_frame)
-
-    def predict(self, X):
-        predict_frame = self._to_h2o_frame(X)
-        return self.model.predict(predict_frame).as_data_frame()["p1"].to_numpy()
-
-    def _to_h2o_frame(self, X, y=None):
-        df = pd.DataFrame(data=X, columns=self.features)
-        if y is not None:
-            df[self.target] = y
-        h2o_frame = h2o.H2OFrame(df)
-        if y is not None:
-            h2o_frame[self.target] = h2o_frame[self.target].asfactor()
-        return h2o_frame
 
 
 class ScikitModel(CalibratableModelMixin):
